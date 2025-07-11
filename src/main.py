@@ -9,6 +9,19 @@ api_key = os.getenv("SOLAR_API_KEY")
 
 user_input = input()
 
+
+# def label_abuse_rule_based(text):
+#     gender_keywords = ["시집","결혼","장가"]
+#     age_keywords = []
+#     abuse_keywords = []
+    
+#     if any(word in text for word in gender_keywords):
+#         labels.append("gender")
+#     if any(word in text for word in age_keywords):
+#         labels.append("age")
+#     if any(word in text for word in abuse_keywords):
+#         lables.append("abuse")
+
 prompt = f"""
 다음은 면접 중 발화된 문장과 그에 대한 분류 예시입니다.
 
@@ -55,13 +68,13 @@ prompt = f"""
 
 문장: {user_input}
 분류:
-
+설명:
 
 **참고사항**
 성차별: 여성/남성 선호, 외모 평가, 출산/결혼 관련 질문 등을 이야기 합니다.
 모욕적 언행: 지원자를 하대하는 표현, 부적절한 반말, 강압적 어투 그리고 지역 차별, 병역 등 민감한 요소 언급을 하거나 혐오 발언이 포함된 표현을 이야기 합니다.
 
-[성차별], [나이차별], [모욕적 언행] 세가지 카테고리 중 포함되는 내용으로 분류하여 주십시오.
+[성차별], [나이차별], [모욕적 언행] 세가지 카테고리 중 포함되는 내용으로 분류하세요
 세가지 중 아무것도 포함되지 않으면 [판별 불가] 라고 출력하세요.
 세가지 중 포함되는 대상이 2개 이상이면 해당 카테고리를 모두 출력하세요.
 
@@ -69,7 +82,17 @@ prompt = f"""
 
 chat = ChatUpstage(api_key=api_key)
 messages = [
+    SystemMessage(content="당신은 채용 갑질 발언을 분류하는 AI입니다. 성차별, 나이차별, 모욕적 언행 발언을 분류합니다."),
     HumanMessage(content=prompt)
 ]
 response = chat.invoke(messages)
-print(response.content)
+response = response.content.split(":")[1].split('\n')[0]
+print(response) # type : str
+
+# labels = []
+# if any("성차별" in ):
+#          labels.append("gender")
+#      if any(word in text for word in age_keywords):
+#          labels.append("age")
+#      if any(word in text for word in abuse_keywords):
+#          lables.append("abuse")
