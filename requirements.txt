@@ -1,0 +1,9 @@
+python-dotenv
+openai==1.95.0
+
+pymupdf
+
+langchain-core
+langchain-upstage
+langchain_community
+faiss-cpu
