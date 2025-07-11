@@ -89,10 +89,12 @@ response = chat.invoke(messages)
 response = response.content.split(":")[1].split('\n')[0]
 print(response) # type : str
 
-# labels = []
-# if any("성차별" in ):
-#          labels.append("gender")
-#      if any(word in text for word in age_keywords):
-#          labels.append("age")
-#      if any(word in text for word in abuse_keywords):
-#          lables.append("abuse")
+labels = []
+if str("성차별") in response:
+    labels.append("gender")
+if str("나이 차별") in response:
+    labels.append("age")
+if str("모욕적 언행") in response:
+    lables.append("abuse")
+
+print(labels)
