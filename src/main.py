@@ -1,26 +1,21 @@
 from langchain_upstage import ChatUpstage
+from langchain_upstage import UpstageEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 import os
 
 #load enviroment variables
 load_dotenv()
 api_key = os.getenv("SOLAR_API_KEY")
+chat = ChatUpstage(api_key=api_key)
 
 user_input = input()
-
-
-# def label_abuse_rule_based(text):
-#     gender_keywords = ["시집","결혼","장가"]
-#     age_keywords = []
-#     abuse_keywords = []
-    
-#     if any(word in text for word in gender_keywords):
-#         labels.append("gender")
-#     if any(word in text for word in age_keywords):
-#         labels.append("age")
-#     if any(word in text for word in abuse_keywords):
-#         lables.append("abuse")
 
 prompt = f"""
 다음은 면접 중 발화된 문장과 그에 대한 분류 예시입니다.
@@ -80,21 +75,59 @@ prompt = f"""
 
 """
 
-chat = ChatUpstage(api_key=api_key)
 messages = [
     SystemMessage(content="당신은 채용 갑질 발언을 분류하는 AI입니다. 성차별, 나이차별, 모욕적 언행 발언을 분류합니다."),
     HumanMessage(content=prompt)
 ]
 response = chat.invoke(messages)
-response = response.content.split(":")[1].split('\n')[0]
-print(response) # type : str
+speaking = user_input
+label = response.content.split(":")[1].split('\n')[0].strip()
+comment = response.content.split("설명:")[1].strip()
 
-labels = []
-if str("성차별") in response:
-    labels.append("gender")
-if str("나이 차별") in response:
-    labels.append("age")
-if str("모욕적 언행") in response:
-    lables.append("abuse")
+# RAG
 
-print(labels)
+# create vector DB
+loader = PyPDFLoader(os.getcwd() + "/../docs/gender/gender_hiring_law.pdf")
+docs = loader.load()
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500, chunk_overlap=50
+)
+split_documents = splitter.split_documents(docs)
+print(len(split_documents))
+# do embedding
+embeddings = UpstageEmbeddings(
+    api_key=api_key,
+    model="solar-embedding-1-large-query"
+)
+
+vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
+retriever = vectorstore.as_retriever()
+
+if not "성차별" in label:
+    prompt = PromptTemplate.from_template(
+        """
+        당신은 법률 전문가입니다. 다음 면접관의 발언이 성차별에 해당되지 않는지 관련 법에 근거하여 설명해 주세요.
+        
+        [문장]
+        {speaking}
+        
+        [관련 법]
+        {context}
+        """
+    )
+else:
+    prompt = PromptTemplate.from_template(
+        """
+        당신은 법률 전문가입니다. 다음 면접관의 발언이 성차별에 해당 되는지 관련 법에 근거하여 설명해 주세요.
+        
+        [문장]
+        {speaking}
+        
+        [관련 법]
+        {context}
+        """
+    )
+chain = ({"context": retriever, "speaking": RunnablePassthrough()} | prompt | chat | StrOutputParser())
+response = chain.invoke(user_input)
+print(response)

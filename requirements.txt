@@ -1,7 +1,7 @@
 python-dotenv
 openai==1.95.0
 
-pymupdf
+pypdf
 
 langchain-core
 langchain-upstage
