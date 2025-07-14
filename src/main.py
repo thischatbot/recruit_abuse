@@ -10,6 +10,18 @@ from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 import os
 
+retriever_dict = {}
+
+def get_retreiver_by_label(label: str):
+    if "성차별" in label:
+        return retriever_dict["gender"]
+    elif "나이차별" in label:
+        return retriever_dict["age"]
+    elif "모욕적 언행" in label:
+        return retriever_dict["abuse"]
+    else:
+        return None
+
 #load enviroment variables
 load_dotenv()
 api_key = os.getenv("SOLAR_API_KEY")
@@ -71,25 +83,54 @@ classification_chain = ({"text": RunnablePassthrough()} | classification_prompt 
 classification_output = classification_chain.invoke(user_input)
 #print(classification_output)
 label = classification_output.split(":")[1].split('\n')[0].strip()
-
+print(label)
 #####
 # create vector DB
-loader = PyPDFLoader(os.getcwd() + "/../docs/gender/gender_hiring_law.pdf")
-docs = loader.load()
+
+# prepare for docs
+category_docs = {
+    "gender": [
+        "gender/남녀고용평등과 일ㆍ가정 양립 지원에 관한 법률(법률)(제20521호)(20250223).pdf"
+    ],
+    "age": [
+        "age/고용상 연령차별금지 및 고령자고용촉진에 관한 법률(법률)(제18921호)(20220610).pdf"
+    ],
+    "abuse": [
+        "abuse/근로기준법_직장_내_괴롭힘.pdf",
+        "abuse/채용절차의 공정화에 관한 법률(법률)(제17326호)(20200526).pdf"
+    ]
+}
 
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=500, chunk_overlap=50
 )
-split_documents = splitter.split_documents(docs)
-# do embedding
 embeddings = UpstageEmbeddings(
     api_key=api_key,
     model="solar-embedding-1-large-query"
 )
 
-vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
-retriever = vectorstore.as_retriever()
+#path for saving vector DB
+db_root_path = os.getcwd() + "/../vector_dbs"
 
+for category, files in category_docs.items():
+    docs = []
+    for file in files:
+        path = os.getcwd() + "/../docs/" + file
+        if os.path.exists(path):
+            loader = PyPDFLoader(path)
+            docs.extend(loader.load())
+
+    split_documents = splitter.split_documents(docs)
+    vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
+
+    save_path = os.path.join(db_root_path, category)
+    vectorstore.save_local(save_path)
+    
+    retriever_dict[category] = vectorstore.as_retriever()
+
+retriever = get_retreiver_by_label(label)
+if retriever is None:
+    print("retriever 호출 실패")
 
 law_explain_prompt = PromptTemplate.from_template(
     """
@@ -110,6 +151,3 @@ law_explain_chain = ({"context": retriever, "text": RunnablePassthrough(), "law_
                      | law_explain_prompt | chat | StrOutputParser())
 law_explanation = law_explain_chain.invoke(user_input)
 print(law_explanation)
-
-
-# comment = response.content.split("설명:")[1].strip()
