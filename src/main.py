@@ -28,62 +28,6 @@ api_key = os.getenv("SOLAR_API_KEY")
 chat = ChatUpstage(api_key=api_key)
 
 user_input = "여자는 연애를 하고 결혼을 하고 애를 낳아야 한다. 그렇지 않으면 같이 일 못하겠다."
-
-# labeling 
-classification_prompt = PromptTemplate.from_template(
-    """
-    당신은 법률 전문가입니다.
-    다음은 면접 중 발화된 문장과 그에 대한 분류 예시입니다.
-    
-    문장: (여성 지원자에게) 육아휴직 쓸 텐데, 뽑지 말자
-    분류: 성차별
-
-    문장: 여자는 애 낳아야지.
-    분류: 성차별
-
-    문장: 여성은 연애 → 결혼 → 출산을 해야 한다. 그렇게 안 하는 사람을 우리가 어떻게 믿고 같이 일하냐
-    분류: 성차별
-
-    문장: 여자들은 대부분 결혼하면 일을 그만둬서 여자를 뽑기 꺼려진다. 다들 결혼하면 그만둘 거냐?
-    분류: 성차별
-
-    문장: 65세 이상은 다 내보내라
-    분류: 나이 차별
-
-    문장: 나이가 몇인데 경력이 이거밖에 안 돼
-    분류: 나이 차별
-
-    문장: (암 투병 중인 가족을 간호하느라 공백이 생긴 사람에게) 직장보다 가족이 우선인 사람은 싫다.
-    분류: 나이 차별
-
-    문장: 부모님이 언제 이혼하셨나? 그래서 성격에 문제가 있는 거 아니야?
-    분류: 모욕적 언행
-
-    문장: 정치 성향이 진보인지, 보수인지 답변해달라.
-    분류: 모욕적 언행
-
-    문장: 웃겨 보라.
-    분류: 모욕적 언행
-
-    이제 다음 문장을 분류해 주세요.
-
-    문장: {text}
-    분류:
-
-    **참고사항**
-    성차별: 여성/남성 선호, 외모 평가, 출산/결혼 관련 질문 등을 이야기 합니다.
-    모욕적 언행: 지원자를 하대하는 표현, 부적절한 반말, 강압적 어투 그리고 지역 차별, 병역 등 민감한 요소 언급을 하거나 혐오 발언이 포함된 표현을 이야기 합니다.
-
-    [성차별], [나이차별], [모욕적 언행] 세가지 카테고리 중 포함되는 내용으로 분류하세요
-    세가지 중 아무것도 포함되지 않으면 [판별 불가] 라고 출력하세요.
-    세가지 중 포함되는 대상이 2개 이상이면 해당 카테고리를 모두 출력하세요.
-    """
-)
-classification_chain = ({"text": RunnablePassthrough()} | classification_prompt | chat | StrOutputParser())
-classification_output = classification_chain.invoke(user_input)
-#print(classification_output)
-label = classification_output.split("분류:")[1].split('\n')[0].strip()
-print(label)
 #####
 # create vector DB
 
@@ -111,51 +55,49 @@ embeddings = UpstageEmbeddings(
 
 #path for saving vector DB
 db_root_path = os.getcwd() + "/../vector_dbs"
-
+law_docs = []
 for category, files in category_docs.items():
-    docs = []
+    file_docs = []
     for file in files:
         path = os.getcwd() + "/../docs/" + file
         if os.path.exists(path):
             loader = PyPDFLoader(path)
-            docs.extend(loader.load())
+            file_docs.extend(loader.load())
 
-    split_documents = splitter.split_documents(docs)
+    split_documents = splitter.split_documents(file_docs)
     vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
 
     save_path = os.path.join(db_root_path, category)
     vectorstore.save_local(save_path)
     
     retriever_dict[category] = vectorstore.as_retriever()
-
-docs = []
-retrievers = get_retreiver_by_label(label)
-if retrievers:
-    for retriever in retrievers:
-        docs.extend(retriever.get_relevant_documents(user_input))
+    law_docs.extend(retriever_dict[category].invoke(user_input))
+    
         
-if not docs:
+if not law_docs:
     context = "관련 법률 문서가 없습니다."
 else:
-    context = "\n\n".join([doc.page_content for doc in docs]) 
+    context = "\n\n".join([doc.page_content for doc in law_docs]) 
 
 law_explain_prompt = PromptTemplate.from_template(
     """
     당신은 법률 전문가입니다.
-    다음은 면접 중 발화된 문장과 그에 대한 위반 법 분류입니다.
+    다음은 면접 중 발화된 문장입니다.
     
     문장: {text}
-    분류: {law_classification}
+    분류:
+    설명:
 
-    알맞은 법률 조항을 언급하여 다음 문장이 법에 위반되는지 설명을 하세요.
+    알맞은 법률 조항을 언급하여 다음 문장이 어떤 법에 위반되는지 분류하고 설명을 하세요.
+    "성차별", "연령차별", "모욕적 언행" 중에서 분류를 하세요.
+    두개 이상 모두 해당되면 모두 포함시키세요.
     
     [관련 법]
     {context}
     """
 )
 
-law_explain_chain = ({"context": RunnableLambda(lambda x: context), "text": RunnablePassthrough(), "law_classification": RunnableLambda(lambda x: label)} 
+law_explain_chain = ({"context": RunnableLambda(lambda x: context), "text": RunnablePassthrough()} 
                      | law_explain_prompt | chat | StrOutputParser())
 law_explanation = law_explain_chain.invoke(user_input)
-print(label)
 print(law_explanation)
