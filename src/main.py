@@ -13,14 +13,14 @@ import os
 retriever_dict = {}
 
 def get_retreiver_by_label(label: str):
+    retrievers = []
     if "성차별" in label:
-        return retriever_dict["gender"]
-    elif "나이차별" in label:
-        return retriever_dict["age"]
-    elif "모욕적 언행" in label:
-        return retriever_dict["abuse"]
-    else:
-        return None
+        return retrievers.append(retriever_dict["gender"])
+    if "나이차별" in label:
+        return retrievers.append(retriever_dict["age"])
+    if "모욕적 언행" in label:
+        return retrievers.append(retriever_dict["abuse"])
+    return retrievers if retrievers else None
 
 #load enviroment variables
 load_dotenv()
@@ -82,7 +82,7 @@ classification_prompt = PromptTemplate.from_template(
 classification_chain = ({"text": RunnablePassthrough()} | classification_prompt | chat | StrOutputParser())
 classification_output = classification_chain.invoke(user_input)
 #print(classification_output)
-label = classification_output.split(":")[1].split('\n')[0].strip()
+label = classification_output.split("분류:")[1].split('\n')[0].strip()
 print(label)
 #####
 # create vector DB
@@ -128,9 +128,16 @@ for category, files in category_docs.items():
     
     retriever_dict[category] = vectorstore.as_retriever()
 
-retriever = get_retreiver_by_label(label)
-if retriever is None:
-    print("retriever 호출 실패")
+docs = []
+retrievers = get_retreiver_by_label(label)
+if retrievers:
+    for retriever in retrievers:
+        docs.extend(retriever.get_relevant_documents(user_input))
+        
+if not docs:
+    context = "관련 법률 문서가 없습니다."
+else:
+    context = "\n\n".join([doc.page_content for doc in docs]) 
 
 law_explain_prompt = PromptTemplate.from_template(
     """
@@ -142,12 +149,13 @@ law_explain_prompt = PromptTemplate.from_template(
 
     알맞은 법률 조항을 언급하여 다음 문장이 법에 위반되는지 설명을 하세요.
     
-    [성차별 관련 법]
+    [관련 법]
     {context}
     """
 )
 
-law_explain_chain = ({"context": retriever, "text": RunnablePassthrough(), "law_classification": RunnableLambda(lambda x: classification_output)} 
+law_explain_chain = ({"context": RunnableLambda(lambda x: context), "text": RunnablePassthrough(), "law_classification": RunnableLambda(lambda x: label)} 
                      | law_explain_prompt | chat | StrOutputParser())
 law_explanation = law_explain_chain.invoke(user_input)
+print(label)
 print(law_explanation)
