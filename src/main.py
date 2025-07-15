@@ -39,8 +39,8 @@ summarization_prompt = PromptTemplate.from_template(
     """
 )
 summarization_chain = ({"text": RunnablePassthrough()} | summarization_prompt | chat | StrOutputParser())
-user_input = summarization_chain.invoke(user_input)
-print("요약된 문장 : " + user_input)
+summarized_output = summarization_chain.invoke(user_input)
+print("요약된 문장 : " + summarized_output)
 #####
 # create vector DB
 
@@ -84,7 +84,7 @@ for category, files in category_docs.items():
     vectorstore.save_local(save_path)
     
     retriever_dict[category] = vectorstore.as_retriever()
-    law_docs.extend(retriever_dict[category].invoke(user_input))
+    law_docs.extend(retriever_dict[category].invoke(summarized_output))
     
         
 if not law_docs:

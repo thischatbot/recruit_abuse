@@ -7,3 +7,5 @@ langchain-core
 langchain-upstage
 langchain_community
 faiss-cpu
+
+streamlit
