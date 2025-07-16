@@ -45,8 +45,6 @@ streamlit run streamlit.py
 
 ## 📌 TODO
 
-- [ ] 벡터 DB 캐싱 구조 분리
-- [ ] 사용자 입력 테스트 파싱
 - [ ] 테스트 케이스 기반 정확도/응답 속도 보정 : 벡터 DB
 - [ ] 테스트 케이스 기반 정확도 보정 : 프롬프트
 - [ ] Streamlit Cloud 배포
