@@ -1,3 +1,5 @@
+<img width="726" height="845" alt="image" src="https://github.com/user-attachments/assets/c1266172-94d2-4bee-92b1-2dfea97548cd" />
+
 ## 소개 (about)
 
 **갑질 Job아드립니다**는 사용자로부터 면접 경험을 입력 받아 그 발언이 **성차별 / 나이차별 / 모욕적 언행**에 해당하는지 자동으로 분류하고, **관련 법률 조항을 기반으로 법적 해설**까지 제공하는 AI 기반 웹앱입니다
