@@ -59,4 +59,6 @@ else:
     st.markdown("### 🗣 입력한 내용")
     st.write(user_input)
     st.markdown("### 🔍 분석한 내용")
-    st.write(analyze_interview(user_input=user_input, api_key=api_key, vectorstore=vectorstore))
+    with st.spinner("분석 중입니다..."):
+        result = analyze_interview(user_input=user_input, api_key=api_key, vectorstore=vectorstore)
+    st.write(result)
