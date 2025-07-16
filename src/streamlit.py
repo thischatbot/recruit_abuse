@@ -20,6 +20,12 @@ questions = [
     "3. 면접 중 기분 나빴던 발언은 있었나요?",
 ]
 
+questions_summary = [
+    "1. 면접부터 채용까지의 과정 : ",
+    "\n\n 2. 기억에 남는 질문 : ",
+    "\n\n 3. 기분 나빴던 발언 : ",
+]
+
 def next_step():
     if st.session_state.answers[st.session_state.step].strip() != "":
         st.session_state.step += 1
@@ -40,8 +46,12 @@ if st.session_state.step < len(questions):
     )
     st.button("다음", on_click=next_step)
 else:
+    user_input_list = []
     #start analyze
-    user_input = "\n".join(st.session_state.answers)
+    for question, answer in zip(questions_summary, st.session_state.answers):
+        user_input_list.append(question)
+        user_input_list.append(answer)
+    user_input = "\n".join(user_input_list)
     st.markdown("### 입력한 내용")
     st.markdown(user_input)
     st.markdown("### 분석한 내용")
