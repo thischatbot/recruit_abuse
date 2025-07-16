@@ -1,11 +1,15 @@
 import streamlit as st
 from dotenv import load_dotenv
 import os
-from langchain_yj import analyze_interview
+from langchain_yj import analyze_interview, save_local_vector_db, load_local_vector_db
 
 #load enviroment variables
 load_dotenv()
 api_key = os.getenv("SOLAR_API_KEY")
+
+save_local_vector_db(api_key)
+
+vectorstore = load_local_vector_db(api_key)
 
 st.set_page_config(page_title="갑질 발언 분석기", layout="centered")
 
@@ -55,4 +59,4 @@ else:
     st.markdown("### 입력한 내용")
     st.markdown(user_input)
     st.markdown("### 분석한 내용")
-    st.markdown(analyze_interview(user_input=user_input, api_key=api_key))
+    st.markdown(analyze_interview(user_input=user_input, api_key=api_key, vectorstore=vectorstore))

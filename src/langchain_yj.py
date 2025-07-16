@@ -1,32 +1,16 @@
-def analyze_interview(user_input: str, api_key: str) -> str:
-    from langchain_upstage import ChatUpstage
-    from langchain_upstage import UpstageEmbeddings
-    from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_community.vectorstores import FAISS
+from langchain_upstage import UpstageEmbeddings
+import streamlit as st
+import os
+
+category_list = ["gender", "age", "abuse"]
+#path for saving vector DB
+db_root_path = os.getcwd() + "/../vector_dbs"
+
+@st.cache_data
+def save_local_vector_db(api_key):
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.document_loaders import PyPDFLoader
-    from langchain_community.vectorstores import FAISS
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-    from langchain_core.prompts import PromptTemplate
-    import os
-    
-    chat = ChatUpstage(api_key=api_key)
-    # labeling 
-    summarization_prompt = PromptTemplate.from_template(
-        """
-        다음 문장을 요약하세요.
-        "성차별", "나이차별", "모욕적 언행" 중 하나라도 해당되는 상황이 있으면 생략하지 마세요.
-        "성차별", "나이차별", "모욕적 언행" 중 해당되지 않은 것이 있으면 포함시키지 마세요.
-        주관적인 의견을 출력하지 마세요. 분류된 라벨을 출력하지 마세요.
-        문장 : {text}
-        """
-    )
-    summarization_chain = ({"text": RunnablePassthrough()} | summarization_prompt | chat | StrOutputParser())
-    summarized_output = summarization_chain.invoke(user_input)
-    print("요약된 문장 : " + summarized_output)
-    #####
-    # create vector DB
-
     # prepare for docs
     category_docs = {
         "gender": [
@@ -41,19 +25,20 @@ def analyze_interview(user_input: str, api_key: str) -> str:
         ]
     }
 
+    saved_paths = []
+    
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500, chunk_overlap=50
     )
     embeddings = UpstageEmbeddings(
         api_key=api_key,
-        model="solar-embedding-1-large-query"
+        model="solar-embedding-1-large-passage"
     )
-
-    #path for saving vector DB
-    db_root_path = os.getcwd() + "/../vector_dbs"
-    law_docs = []
-    retriever_dict = {}
     for category, files in category_docs.items():
+        save_path = os.path.join(db_root_path, category)
+        if os.path.exists(save_path):
+            pass
+        
         file_docs = []
         for file in files:
             path = os.getcwd() + "/../docs/" + file
@@ -63,14 +48,60 @@ def analyze_interview(user_input: str, api_key: str) -> str:
 
         split_documents = splitter.split_documents(file_docs)
         vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
-
-        save_path = os.path.join(db_root_path, category)
         vectorstore.save_local(save_path)
+        saved_paths.append(save_path)
+    
+    return saved_paths
         
-        retriever_dict[category] = vectorstore.as_retriever()
-        law_docs.extend(retriever_dict[category].invoke(summarized_output))
-        
+def load_local_vector_db (api_key) -> FAISS :
+    vectorstore_list = []
+    
+    embeddings = UpstageEmbeddings(
+        api_key=api_key,
+        model="solar-embedding-1-large-passage"
+    )
+    
+    vectordb_merged = None
+    for category in category_list:
+        save_path = os.path.join(db_root_path, category)
+        # allow_dangerous_deserialization should be True ONLY if all the vectorstore files can be trusted
+        if os.path.exists(save_path):
+            vectorstore = FAISS.load_local(save_path, embeddings=embeddings, allow_dangerous_deserialization=True)
+            if vectordb_merged is not None:
+                vectorstore.merge_from(vectordb_merged)
+            vectordb_merged = vectorstore
             
+    return vectordb_merged
+
+def analyze_interview(user_input: str, api_key: str, vectorstore) -> str:
+    from langchain_upstage import ChatUpstage
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+    from langchain_core.prompts import PromptTemplate
+    
+    chat = ChatUpstage(api_key=api_key)
+    # labeling 
+    summarization_prompt = PromptTemplate.from_template(
+        """
+        다음 면접 후기를 객관적 상황으로 요약하세요.
+        "성차별", "나이차별", "모욕적 언행" 중 하나라도 해당되는 상황이 있으면 생략하지 마세요.
+        
+        면접 후기 : {text}
+        
+        성차별: 여성/남성 선호, 외모 평가, 출산/결혼 관련 질문 등을 이야기 합니다.
+        나이 차별: “젊은 인재”, “30대 이하 우대” 등 법적으로 문제 있는 표현을 이야기 합니다.
+        모욕적 언행: 지원자를 하대하는 표현, 부적절한 반말, 강압적 어투 그리고 지역 차별, 병역 등 민감한 요소 언급을 하거나 혐오 발언이 포함된 표현을 이야기 합니다.
+        """
+    )
+    summarization_chain = ({"text": RunnablePassthrough()} | summarization_prompt | chat | StrOutputParser())
+    summarized_output = summarization_chain.invoke(user_input)
+    print("요약된 문장 : " + summarized_output)
+    
+    law_docs = []
+    
+    retriever = vectorstore.as_retriever()
+    law_docs.extend(retriever.invoke(summarized_output))
+
     if not law_docs:
         context = "관련 법률 문서가 없습니다."
     else:
