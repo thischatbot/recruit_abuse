@@ -4,7 +4,7 @@ import os
 from langchain_yj import analyze_interview, save_local_vector_db, load_local_vector_db
 
 #load enviroment variables
-load_dotenv()
+#load_dotenv()
 #api_key = os.getenv("SOLAR_API_KEY")
 api_key = st.secrets["SOLAR_API_KEY"]
 #save_local_vector_db(api_key)
