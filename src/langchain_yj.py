@@ -69,6 +69,9 @@ def load_local_vector_db (api_key) -> FAISS :
         # allow_dangerous_deserialization should be True ONLY if all the vectorstore files can be trusted
         if os.path.exists(save_path):
             vectorstore = FAISS.load_local(save_path, embeddings=embeddings, allow_dangerous_deserialization=True)
+            if vectorstore is None:
+                st.warning(f"Vector store for {category} is empty or not found.")
+                continue
             if vectordb_merged is not None:
                 vectorstore.merge_from(vectordb_merged)
             vectordb_merged = vectorstore
