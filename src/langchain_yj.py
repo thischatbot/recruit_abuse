@@ -2,10 +2,12 @@ from langchain_community.vectorstores import FAISS
 from langchain_upstage import UpstageEmbeddings
 import streamlit as st
 import os
+from pathlib import Path
 
 category_list = ["gender", "age", "abuse"]
 #path for saving vector DB
-db_root_path = os.getcwd() + "./vector_dbs"
+BASE_DIR = Path(__file__).resolve().parent
+db_root_path = BASE_DIR / "vector_dbs"
 
 @st.cache_data
 def save_local_vector_db(api_key):
