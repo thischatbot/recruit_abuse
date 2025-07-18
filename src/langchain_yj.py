@@ -99,7 +99,10 @@ def analyze_interview(user_input: str, api_key: str, vectorstore) -> str:
     
     law_docs = []
     
-    retriever = vectorstore.as_retriever()
+    retriever = vectorstore.as_retriever(
+        search_type="similarity_score_threshold",
+        search_kwargs={"score_threshold": 0.7},
+    )
     law_docs.extend(retriever.invoke(summarized_output))
 
     if not law_docs:
@@ -116,9 +119,10 @@ def analyze_interview(user_input: str, api_key: str, vectorstore) -> str:
         분류:
         설명:
 
-        알맞은 법률 조항을 언급하여 다음 문장이 어떤 법에 위반되는지 분류하고 설명을 하세요.
+        알맞은 법률 조항을 언급하여 다음 문장이 어떤 법, 조항에 위반되는지 분류하고 설명을 하세요.
         객관적으로 법을 참고하여 "성차별", "연령차별", "모욕적 언행" 중에서 분류를 하세요.
         법에 위반되지 않으면 분류하지 마세요.
+        모욕적 언행은 직장 내 괴롭힘 금지법을 참고하세요.
         두개 이상 모두 해당되면 모두 포함시키세요.
         
         [관련 법]
