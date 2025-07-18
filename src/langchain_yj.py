@@ -5,7 +5,7 @@ import os
 
 category_list = ["gender", "age", "abuse"]
 #path for saving vector DB
-db_root_path = os.getcwd() + "/../vector_dbs"
+db_root_path = os.getcwd() + "./vector_dbs"
 
 @st.cache_data
 def save_local_vector_db(api_key):
