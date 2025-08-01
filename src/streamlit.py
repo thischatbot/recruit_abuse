@@ -1,17 +1,21 @@
 import streamlit as st
 from dotenv import load_dotenv
 import os
-from langchain_yj import analyze_interview, save_local_vector_db, load_local_vector_db
+
+from rag.vector_builder import save_local_vector_db
+from rag.query_chain import run_legal_rag
 
 #load enviroment variables
-#load_dotenv()
-#api_key = os.getenv("SOLAR_API_KEY")
-api_key = st.secrets["SOLAR_API_KEY"]
-#save_local_vector_db(api_key)
-
-vectorstore = load_local_vector_db(api_key)
+load_dotenv()
+api_key = os.getenv("SOLAR_API_KEY") or st.secrets["SOLAR_API_KEY"]
 
 st.set_page_config(page_title="갑질 발언 분석기", layout="centered")
+
+# upper: add button
+if st.button("📦 벡터 DB 저장 (최초 1회만 누르세요!)"):
+    with st.spinner("문서를 분석하고 벡터 DB를 저장 중입니다..."):
+        saved_paths = save_local_vector_db(api_key)
+    st.success(f"다음 경로에 저장 완료됨:\n\n" + "\\n".join(saved_paths))
 
 #initialize session state
 if "step" not in st.session_state:
@@ -40,25 +44,27 @@ st.markdown("### 기분 job치는 갑질 면접💥 법으로 job다💥")
 #sliding card
 if st.session_state.step < len(questions):
     st.markdown(f"### {questions[st.session_state.step]}")
-    #input text
     st.text_area(
         label="",
         key=f"answer_{st.session_state.step}",
         value=st.session_state.answers[st.session_state.step],
-        on_change=lambda: st.session_state.answers.__setitem__(st.session_state.step, st.session_state.get(f"answer_{st.session_state.step}")),
+        on_change=lambda: st.session_state.answers.__setitem__
+        (st.session_state.step,
+         st.session_state.get(f"answer_{st.session_state.step}")
+         ),
         height=150,
     )
     st.button("✅ 다음", on_click=next_step)
 else:
-    user_input_list = []
-    #start analyze
-    for question, answer in zip(questions_summary, st.session_state.answers):
-        user_input_list.append(question)
-        user_input_list.append(answer)
-    user_input = "\n".join(user_input_list)
+    user_input = "\n".join([
+        q + "\n" + a for q, a in zip(questions_summary, st.session_state.answers)
+    ])
+    
     st.markdown("### 🗣 입력한 내용")
     st.write(user_input)
+    
     st.markdown("### 🔍 분석한 내용")
     with st.spinner("분석 중입니다..."):
-        result = analyze_interview(user_input=user_input, api_key=api_key, vectorstore=vectorstore)
+        category = "abuse"
+        result = run_legal_rag(api_key=api_key, user_question=user_input, category=category)
     st.write(result)
