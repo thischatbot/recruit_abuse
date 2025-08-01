@@ -6,7 +6,9 @@ from pathlib import Path
 import os
 from .constants import CATEGORY_LIST
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve()
+while not (BASE_DIR / "docs").exists():
+    BASE_DIR = BASE_DIR.parent
 db_root_path = BASE_DIR / "vector_dbs"
 
 def save_local_vector_db(api_key):
